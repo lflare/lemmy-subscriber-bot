@@ -1,0 +1,14 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+- name: docker
+  image: plugins/docker
+  settings:
+    repo: lflare/lemmy-subscriber-bot
+    tags: latest
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
