@@ -15,7 +15,7 @@ _P.S. Please only use this tool on your own Lemmy instance servers._
 ### Docker
 
 ```bash
-docker run --name lemmy-subscriber-bot --restart always -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot .
+docker run --name lemmy-subscriber-bot --restart always -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot
 
 # OR
 
