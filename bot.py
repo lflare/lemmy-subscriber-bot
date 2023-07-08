@@ -234,7 +234,7 @@ def main():
     parser.add_argument("--threshold-add", default=os.environ.get("LEMMY_THRESHOLD_ADD", 10))
     parser.add_argument("--threshold-subscribe", default=os.environ.get("LEMMY_THRESHOLD_SUBSCRIBE", 50))
     parser.add_argument("--daemon", action="store_true", default=False)
-    parser.add_argument("--daemon-delay", default=3600)
+    parser.add_argument("--daemon-delay", default=86400)
     args = parser.parse_args()
     if not args.domain or not args.username or not args.password:
         exit(parser.print_usage())
