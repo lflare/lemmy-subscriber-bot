@@ -88,11 +88,28 @@ class Bot:
             raise e
 
     def get_instances(self):
-        r = requests.get(
-            "https://raw.githubusercontent.com/maltfield/awesome-lemmy-instances/main/awesome-lemmy-instances.csv"
-        )
-        results = re.findall(r"\(https://(.*)\)", r.text)
-        return results
+        # Loop through Lemmyverse instance URLs
+        instances = []
+        for i in range(999):
+            try:
+                # Get and parse instance list
+                r = requests.get(f"https://lemmyverse.net/data/instance/{i}.json")
+                data = r.json()
+                for instance in data:
+                    # Check user count, and skip if below resolve threshold
+                    if instance["usage"]["users"]["activeHalfyear"] < self.threshold_resolve:
+                        continue
+
+                    # Add URL
+                    instances.append(instance["baseurl"])
+            except requests.exceptions.JSONDecodeError:
+                break
+            except Exception as e:
+                logger.exception(e)
+                break
+
+        # Return results
+        return instances
 
     def get_instance_communities(self, instance):
         communities = []
