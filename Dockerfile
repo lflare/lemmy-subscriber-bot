@@ -14,7 +14,7 @@ VOLUME [ "/data" ]
 ENV LEMMY_DATABASE /data/database.db
 
 # Set entrypoint and command
-CMD [ "python3", "bot.py"]
+ENTRYPOINT [ "python3", "bot.py" ]
 
 # Add bot.py
 COPY bot.py /bot.py

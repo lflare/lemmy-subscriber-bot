@@ -15,25 +15,37 @@ _P.S. Please only use this tool on your own Lemmy instance servers._
 ### Docker
 
 ```bash
-docker run --name lemmy-subscriber-bot --restart always -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot
+# To run it once in the background
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot
 
-# OR
+# To run it as a daemon
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' --restart always lflare/lemmy-subscriber-bot --daemon
 
-docker build -t lemmy-subscriber-bot
-docker run --name lemmy-subscriber-bot --restart always -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lemmy-subscriber-bot .
+# To run it only on selected instances
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' --restart always lflare/lemmy-subscriber-bot --instances 'lemmy.ml,beehaw.org'
+
+# To run it except selected instances
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' --restart always lflare/lemmy-subscriber-bot --instances '!badlemmy.com'
+
+## OR
+
+docker build -t lemmy-subscriber-bot .
+docker run --name lemmy-subscriber-bot --restart always -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lemmy-subscriber-bot
 ```
 
 ### Manual
 
 ```bash
 $ pip3 install -r requirements.txt
-$ python3 bot.py -h
-usage: bot.py [-h] [--database DATABASE] [--domain DOMAIN] [--username USERNAME] [--password PASSWORD] [--threshold-add THRESHOLD_ADD] [--threshold-subscribe THRESHOLD_SUBSCRIBE] [--daemon] [--daemon-delay DAEMON_DELAY]
+usage: bot.py [-h] [-v] [--database DATABASE] [--domain DOMAIN] [--username USERNAME] [--password PASSWORD]
+              [--threshold-add THRESHOLD_ADD] [--threshold-subscribe THRESHOLD_SUBSCRIBE] [--daemon]
+              [--daemon-delay DAEMON_DELAY] [--instances INSTANCES]
 
 lemmy-subscriber
 
 options:
   -h, --help            show this help message and exit
+  -v, --verbose
   --database DATABASE
   --domain DOMAIN
   --username USERNAME
@@ -42,5 +54,7 @@ options:
   --threshold-subscribe THRESHOLD_SUBSCRIBE
   --daemon
   --daemon-delay DAEMON_DELAY
+  --instances INSTANCES
+                        comma-separated instances, e.g. 'lemmy.ml,beehaw.org'
 $ python3 bot.py --domain lemmy.world --username subscriber_bot --password subscriber_bot
 ```
