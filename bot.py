@@ -131,6 +131,40 @@ class Bot:
         rt.join()
         st.join()
 
+    def reset(self):
+        # Get JWT
+        self.retrieve_jwt()
+
+        # Get all subscribed communities
+        communities = []
+        for i in range(1, 999):
+            try:
+                # Get and parse community list
+                r = session.get(f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw=true&page={i}")
+                r_json = r.json()
+                if len(r_json["communities"]) == 0:
+                    break
+
+                # Add to communities
+                communities.extend(r_json["communities"])
+            except requests.exceptions.JSONDecodeError as e:
+                break
+            except requests.exceptions.Timeout as e:
+                logger.error(f"failed to get lemmyverse.net instances - {e}")
+                break
+            except Exception as e:
+                logger.exception(e)
+                break
+
+        # Loop through communities and unsubscribe
+        for community in communities:
+            if len(self.bad_instances) > 0:
+                actor_id = community["community"]["actor_id"]
+                instance = actor_id.split("/")[2]
+                if instance not in self.bad_instances:
+                    continue
+            self.unsubscribe_community(community["community"]["actor_id"], community["community"]["id"])
+
     @logger.catch(reraise=True, message="failed to login")
     def retrieve_jwt(self):
         payload = {"username_or_email": self.username, "password": self.password}
@@ -293,6 +327,35 @@ class Bot:
             self.db[community_addr] = -1
             break
 
+    def unsubscribe_community(self, community_addr, community_id):
+        # Try up to 5 times to unsubscribe to a community
+        for _ in range(5):
+            # Attempt to resolve
+            id = self.resolve_community(community_addr)
+            if id <= 0:
+                continue
+
+            # Attempt to unsubscribe
+            try:
+                follow_payload = {"community_id": id, "follow": False, "auth": self.jwt}
+                r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
+                r_json = r.json()
+            except requests.exceptions.JSONDecodeError as e:
+                logger.error(f"failed to unsubscribe community - {e}: '{r.text}'")
+                continue
+            except requests.exceptions.Timeout as e:
+                logger.error(f"failed to unsubscribe community - {e}: '{r.text}'")
+                continue
+            except Exception as e:
+                logger.exception("unhandled exception")
+                continue
+
+            # Log and mark as subscribed in DB
+            logger.trace(f"{community_addr} - {r.text}")
+            logger.info(f"UNSUBSCRIBED: {community_addr}")
+            self.db[community_addr] = community_id
+            break
+
     def community_resolver_thread(self):
         while True:
             community_addr = self.rq.get()
@@ -320,6 +383,7 @@ def main():
     # Get and parse arguments
     parser = argparse.ArgumentParser(description="lemmy-subscriber")
     parser.add_argument("-v", "--verbose", action="count", default=0)
+    parser.add_argument("--reset", action="store_true", default=False)
     parser.add_argument("--database", default=os.environ.get("LEMMY_DATABASE"))
     parser.add_argument("--domain", default=os.environ.get("LEMMY_DOMAIN"))
     parser.add_argument("--username", default=os.environ.get("LEMMY_USERNAME"))
@@ -365,8 +429,12 @@ def main():
         bad_instances=bad_instances,
     )
 
-    # Start bot
-    bot.start()
+    if args.reset:
+        # Reset?
+        bot.reset()
+    else:
+        # Start bot
+        bot.start()
 
 
 if __name__ == "__main__":
