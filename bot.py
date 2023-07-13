@@ -41,7 +41,7 @@ class Bot:
         only_instances=[],
         bad_instances=[],
         no_nsfw=False,
-        lang="",
+        lang=None,
         database="database.db",
     ):
         self.db = shelve.open(database)
@@ -218,7 +218,7 @@ class Bot:
     def get_instance_communities(self, instance):
         # If language filter specified, get supported language codes
         lang_id = -1
-        if self.lang != "":
+        if self.lang is not None:
             try:
                 logger.trace(f"retrieving instance details - {instance}")
                 r = session.get(f"https://{instance}/api/v3/site")
@@ -290,7 +290,7 @@ class Bot:
                     continue
 
                 # Get community details if language filter specified
-                if self.lang != "":
+                if self.lang is not None:
                     try:
                         logger.trace(f"retrieving community details - {instance} / {name}")
                         r = session.get(f"https://{instance}/api/v3/community?name={name}")
@@ -465,7 +465,7 @@ def main():
     parser.add_argument("--daemon-delay", default=86400)
     parser.add_argument("--instances", type=str, help="comma-separated instances, e.g. 'lemmy.ml,beehaw.org'")
     parser.add_argument("--no-nsfw", action="store_true", default=False)
-    parser.add_argument("--lang", type=str, default="en", help="language id (37: eng, 32: deutsch)")
+    parser.add_argument("--lang", type=str, help="language id (37: eng, 32: deutsch)")
     args = parser.parse_args()
     if not args.domain or not args.username or not args.password:
         exit(parser.print_usage())
