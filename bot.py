@@ -40,6 +40,7 @@ class Bot:
         daemon_delay,
         only_instances=[],
         bad_instances=[],
+        no_nsfw=False,
         database="database.db",
     ):
         self.db = shelve.open(database)
@@ -52,6 +53,7 @@ class Bot:
         self.daemon_delay = daemon_delay
         self.instances = []
         self.bad_instances = []
+        self.no_nsfw = no_nsfw
 
         # Prepare bot runtime variables
         self.rq = queue.Queue(16)
@@ -215,7 +217,7 @@ class Bot:
         communities = []
         for page in range(1, 99999):
             try:
-                logger.trace(f"retrieving - {instance} / page {page}")
+                logger.trace(f"retrieving communities - {instance} / page {page}")
                 r = session.get(f"https://{instance}/api/v3/community/list?type_=Local&sort=TopSixMonths&page={page}")
                 # sorting logic:
                 # https://github.com/LemmyNet/lemmy/blob/0c82f4e66065b5772fede010a879d327135dbb1e/crates/db_views_actor/src/community_view.rs#L171
@@ -246,6 +248,11 @@ class Bot:
                 actor_id = c["community"]["actor_id"]
                 community_addr = actor_id
                 logger.debug(f"COMMUNITY: {instance}/{name} - {name} - {users_active_half_year = }")
+
+                # Check if nsfw filter passes
+                if self.no_nsfw == True and c["community"]["nsfw"] == True:
+                    logger.debug(f"SKIPPING NSFW: {instance}/{name}")
+                    continue
 
                 # Check if users_active_half_year has passed threshold
                 # to either resolve or subscribe.
@@ -399,6 +406,7 @@ def main():
     parser.add_argument("--daemon", action="store_true", default=False)
     parser.add_argument("--daemon-delay", default=86400)
     parser.add_argument("--instances", type=str, help="comma-separated instances, e.g. 'lemmy.ml,beehaw.org'")
+    parser.add_argument("--no-nsfw", action="store_true", default=False)
     args = parser.parse_args()
     if not args.domain or not args.username or not args.password:
         exit(parser.print_usage())
@@ -433,6 +441,7 @@ def main():
         daemon_delay=args.daemon_delay,
         only_instances=only_instances,
         bad_instances=bad_instances,
+        no_nsfw=args.no_nsfw,
     )
 
     if args.reset:
