@@ -313,7 +313,7 @@ class Bot:
                         break
 
                     # If discussion langauge not specified, or configured language not in discussion languages, skip
-                    if "discussion_languages" not in r_json or self.lang not in r_json["discussion_languages"]:
+                    if "discussion_languages" not in r_json or lang_id not in r_json["discussion_languages"]:
                         logger.debug(f"SKIPPING LANGUAGE: {instance}/{name}")
                         continue
 
