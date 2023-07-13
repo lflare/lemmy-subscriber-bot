@@ -41,7 +41,7 @@ class Bot:
         only_instances=[],
         bad_instances=[],
         no_nsfw=False,
-        lang=None,
+        lang_codes=None,
         database="database.db",
     ):
         self.db = shelve.open(database)
@@ -55,7 +55,7 @@ class Bot:
         self.instances = []
         self.bad_instances = []
         self.no_nsfw = no_nsfw
-        self.lang = lang
+        self.lang_codes = lang
 
         # Prepare bot runtime variables
         self.rq = queue.Queue(16)
@@ -217,8 +217,8 @@ class Bot:
 
     def get_instance_communities(self, instance):
         # If language filter specified, get supported language codes
-        lang_id = -1
-        if self.lang is not None:
+        lang_ids = []
+        if self.lang_codes is not None and len(self.lang_codes) > 0:
             try:
                 logger.trace(f"retrieving instance details - {instance}")
                 r = session.get(f"https://{instance}/api/v3/site")
@@ -238,16 +238,17 @@ class Bot:
             # Loop through all langauges and resolve code
             all_languages = r_json["all_languages"]
             for language in all_languages:
-                if self.lang == language["code"]:
-                    lang_id = language["id"]
+                for lang_code in self.lang_codes:
+                    if lang_code == language["code"]:
+                        lang_ids.append(language["id"])
 
             # If unable to resolve code, play safe and skip
-            if lang_id == -1:
+            if len(lang_ids) != len(self.lang_codes):
                 logger.error(f"unable to resolve language code from '{instance}' - skipping")
                 return
 
             # else proceed
-            logger.info(f"resolved language code of '{self.lang}' to '{lang_id}' on '{instance}'")
+            logger.info(f"resolved language code of '{self.lang_codes}' to '{lang_ids}' on '{instance}'")
 
         communities = []
         for page in range(1, 99999):
@@ -295,7 +296,7 @@ class Bot:
                     continue
 
                 # Get community details if language filter specified
-                if self.lang is not None:
+                if len(lang_ids) > 0:
                     try:
                         logger.trace(f"retrieving community details - {instance} / {name}")
                         r = session.get(f"https://{instance}/api/v3/community?name={name}")
@@ -313,7 +314,12 @@ class Bot:
                         break
 
                     # If discussion langauge not specified, or configured language not in discussion languages, skip
-                    if "discussion_languages" not in r_json or lang_id not in r_json["discussion_languages"]:
+                    logger.info(f"{lang_ids} {r_json['discussion_languages']}")
+                    logger.info(f'{[id for id in r_json["discussion_languages"] if id in lang_ids]}')
+                    if "discussion_languages" not in r_json or len(r_json["discussion_languages"]) == 0:
+                        logger.debug(f"SKIPPING LANGUAGE: {instance}/{name}")
+                        continue
+                    elif len([id for id in r_json["discussion_languages"] if id in lang_ids]) == 0:
                         logger.debug(f"SKIPPING LANGUAGE: {instance}/{name}")
                         continue
 
@@ -470,7 +476,7 @@ def main():
     parser.add_argument("--daemon-delay", default=86400)
     parser.add_argument("--instances", type=str, help="comma-separated instances, e.g. 'lemmy.ml,beehaw.org'")
     parser.add_argument("--no-nsfw", action="store_true", default=False)
-    parser.add_argument("--lang", type=str, help="language id (37: eng, 32: deutsch)")
+    parser.add_argument("--lang-codes", type=str, help="comma-separated language codes (e.g. und, en, de)")
     args = parser.parse_args()
     if not args.domain or not args.username or not args.password:
         exit(parser.print_usage())
@@ -494,6 +500,10 @@ def main():
             else:
                 only_instances.append(instance)
 
+    # Languages
+    if args.lang:
+        args.lang = args.lang.split(",")
+
     # Create bot
     bot = Bot(
         domain=args.domain,
@@ -506,7 +516,7 @@ def main():
         only_instances=only_instances,
         bad_instances=bad_instances,
         no_nsfw=args.no_nsfw,
-        lang=args.lang,
+        lang_codes=args.lang_codes,
     )
 
     if args.reset:
