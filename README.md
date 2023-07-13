@@ -22,10 +22,20 @@ docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot'
 docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' --restart always lflare/lemmy-subscriber-bot --daemon
 
 # To run it only on selected instances
-docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' --restart always lflare/lemmy-subscriber-bot --instances 'lemmy.ml,beehaw.org'
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot --instances 'lemmy.ml,beehaw.org'
 
 # To run it except selected instances
-docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' --restart always lflare/lemmy-subscriber-bot --instances '!badlemmy.com'
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot --instances '!badlemmy.com'
+
+# WARNING: Do not use the following unless you are familiar with the code!
+# To reset subscriptions by unsubscribing from everything
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot --reset
+
+# To filter for only non-NSFW communities
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot --no-nsfw
+
+# To filter for only undefined, or english languages
+docker run --name lemmy-subscriber-bot -dt --env 'LEMMY_USERNAME=subscriber_bot' --env 'LEMMY_PASSWORD=subscriber_bot' --env 'LEMMY_DOMAIN=lemmy.world' lflare/lemmy-subscriber-bot --lang 'und,en'
 
 ## OR
 
@@ -37,15 +47,17 @@ docker run --name lemmy-subscriber-bot --restart always -dt --env 'LEMMY_USERNAM
 
 ```bash
 $ pip3 install -r requirements.txt
-usage: bot.py [-h] [-v] [--database DATABASE] [--domain DOMAIN] [--username USERNAME] [--password PASSWORD]
-              [--threshold-add THRESHOLD_ADD] [--threshold-subscribe THRESHOLD_SUBSCRIBE] [--daemon]
-              [--daemon-delay DAEMON_DELAY] [--instances INSTANCES]
+
+$ python3 bot.py -h
+usage: bot.py [-h] [-v] [--reset] [--database DATABASE] [--domain DOMAIN] [--username USERNAME] [--password PASSWORD] [--threshold-add THRESHOLD_ADD] [--threshold-subscribe THRESHOLD_SUBSCRIBE] [--daemon] [--daemon-delay DAEMON_DELAY] [--instances INSTANCES] [--no-nsfw]
+              [--lang-codes LANG_CODES]
 
 lemmy-subscriber
 
 options:
   -h, --help            show this help message and exit
   -v, --verbose
+  --reset
   --database DATABASE
   --domain DOMAIN
   --username USERNAME
@@ -56,7 +68,9 @@ options:
   --daemon-delay DAEMON_DELAY
   --instances INSTANCES
                         comma-separated instances, e.g. 'lemmy.ml,beehaw.org'
-$ python3 bot.py --domain lemmy.world --username subscriber_bot --password subscriber_bot
+  --no-nsfw
+  --lang-codes LANG_CODES
+                        comma-separated language codes (e.g. und, en, de)
 ```
 
 ## FAQ
