@@ -3,12 +3,27 @@ type: docker
 name: default
 
 steps:
-- name: docker
+- name: nightly
   image: plugins/docker
   settings:
     repo: lflare/lemmy-subscriber-bot
-    tags: latest
+    tags: nightly
     username:
       from_secret: docker_username
     password:
       from_secret: docker_password
+
+- name: release
+  image: plugins/docker
+  settings:
+    repo: lflare/lemmy-subscriber-bot
+    tags:
+     - latest
+     - ${DRONE_TAG}
+    username:
+      from_secret: docker_username
+    password:
+      from_secret: docker_password
+  when:
+    event:
+    - tag
