@@ -284,6 +284,11 @@ class Bot:
                 community_addr = actor_id
                 logger.debug(f"COMMUNITY: {instance}/{name} - {name} - {users_active_half_year = }")
 
+                # Skip if entirely subscribed
+                if community_addr in self.db and self.db[community_addr] == -1:
+                    logger.debug(f"SKIPPING SUBSCRIBED: {instance}/{name}")
+                    continue
+
                 # Check if nsfw filter passes
                 if self.no_nsfw == True and c["community"]["nsfw"] == True:
                     logger.debug(f"SKIPPING NSFW: {instance}/{name}")
