@@ -55,7 +55,7 @@ class Bot:
         self.instances = []
         self.bad_instances = []
         self.no_nsfw = no_nsfw
-        self.lang_codes = lang
+        self.lang_codes = lang_codes
 
         # Prepare bot runtime variables
         self.rq = queue.Queue(16)
@@ -501,8 +501,8 @@ def main():
                 only_instances.append(instance)
 
     # Languages
-    if args.lang:
-        args.lang = args.lang.split(",")
+    if args.lang_codes:
+        args.lang_codes = args.lang.split(",")
 
     # Create bot
     bot = Bot(
