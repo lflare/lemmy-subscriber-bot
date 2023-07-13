@@ -41,6 +41,7 @@ class Bot:
         only_instances=[],
         bad_instances=[],
         no_nsfw=False,
+        lang="",
         database="database.db",
     ):
         self.db = shelve.open(database)
@@ -54,6 +55,7 @@ class Bot:
         self.instances = []
         self.bad_instances = []
         self.no_nsfw = no_nsfw
+        self.lang = lang
 
         # Prepare bot runtime variables
         self.rq = queue.Queue(16)
@@ -214,6 +216,39 @@ class Bot:
         return baseurls
 
     def get_instance_communities(self, instance):
+        # If language filter specified, get supported language codes
+        lang_id = -1
+        if self.lang != "":
+            try:
+                logger.trace(f"retrieving instance details - {instance}")
+                r = session.get(f"https://{instance}/api/v3/site")
+                # sorting logic:
+                # https://github.com/LemmyNet/lemmy/blob/0c82f4e66065b5772fede010a879d327135dbb1e/crates/db_views_actor/src/community_view.rs#L171
+                r_json = r.json()
+            except requests.exceptions.JSONDecodeError as e:
+                logger.error(f"failed to get communities from '{instance}' - {e}: '{r.text}'")
+                return
+            except requests.exceptions.Timeout as e:
+                logger.error(f"failed to get communities from '{instance}' - {e}")
+                return
+            except Exception as e:
+                logger.exception("unhandled exception")
+                return
+
+            # Loop through all langauges and resolve code
+            all_languages = r_json["all_languages"]
+            for language in all_languages:
+                if self.lang == language["code"]:
+                    lang_id = language["id"]
+
+            # If unable to resolve code, play safe and skip
+            if lang_id == -1:
+                logger.error(f"unable to resolve language code from '{instance}' - skipping")
+                return
+
+            # else proceed
+            logger.info(f"resolved language code of '{self.lang}' to '{lang_id}' on '{instance}'")
+
         communities = []
         for page in range(1, 99999):
             try:
@@ -253,6 +288,29 @@ class Bot:
                 if self.no_nsfw == True and c["community"]["nsfw"] == True:
                     logger.debug(f"SKIPPING NSFW: {instance}/{name}")
                     continue
+
+                # Get community details if language filter specified
+                if self.lang != "":
+                    try:
+                        logger.trace(f"retrieving community details - {instance} / {name}")
+                        r = session.get(f"https://{instance}/api/v3/community?name={name}")
+                        # sorting logic:
+                        # https://github.com/LemmyNet/lemmy/blob/0c82f4e66065b5772fede010a879d327135dbb1e/crates/db_views_actor/src/community_view.rs#L171
+                        r_json = r.json()
+                    except requests.exceptions.JSONDecodeError as e:
+                        logger.error(f"failed to get communities from '{instance}' - {e}: '{r.text}'")
+                        break
+                    except requests.exceptions.Timeout as e:
+                        logger.error(f"failed to get communities from '{instance}' - {e}")
+                        break
+                    except Exception as e:
+                        logger.exception("unhandled exception")
+                        break
+
+                    # If discussion langauge not specified, or configured language not in discussion languages, skip
+                    if "discussion_languages" not in r_json or self.lang not in r_json["discussion_languages"]:
+                        logger.debug(f"SKIPPING LANGUAGE: {instance}/{name}")
+                        continue
 
                 # Check if users_active_half_year has passed threshold
                 # to either resolve or subscribe.
@@ -407,6 +465,7 @@ def main():
     parser.add_argument("--daemon-delay", default=86400)
     parser.add_argument("--instances", type=str, help="comma-separated instances, e.g. 'lemmy.ml,beehaw.org'")
     parser.add_argument("--no-nsfw", action="store_true", default=False)
+    parser.add_argument("--lang", type=str, default="en", help="language id (37: eng, 32: deutsch)")
     args = parser.parse_args()
     if not args.domain or not args.username or not args.password:
         exit(parser.print_usage())
@@ -442,6 +501,7 @@ def main():
         only_instances=only_instances,
         bad_instances=bad_instances,
         no_nsfw=args.no_nsfw,
+        lang=args.lang,
     )
 
     if args.reset:
