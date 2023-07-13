@@ -140,7 +140,9 @@ class Bot:
         for i in range(1, 999):
             try:
                 # Get and parse community list
-                r = session.get(f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw=true&page={i}")
+                r = session.get(
+                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw=true&page={i}&auth={self.jwt}"
+                )
                 r_json = r.json()
                 if len(r_json["communities"]) == 0:
                     break
@@ -155,8 +157,10 @@ class Bot:
             except Exception as e:
                 logger.exception(e)
                 break
+        logger.debug(f"got {len(communities)} communities from server")
 
         # Loop through communities and unsubscribe
+        i = 0
         for community in communities:
             if len(self.bad_instances) > 0:
                 actor_id = community["community"]["actor_id"]
@@ -164,6 +168,8 @@ class Bot:
                 if instance not in self.bad_instances:
                     continue
             self.unsubscribe_community(community["community"]["actor_id"], community["community"]["id"])
+            i += 1
+        logger.info(f"unsubscribed from {i}/{len(communities)} communities")
 
     @logger.catch(reraise=True, message="failed to login")
     def retrieve_jwt(self):
