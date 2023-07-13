@@ -12,6 +12,8 @@ steps:
       from_secret: docker_username
     password:
       from_secret: docker_password
+    cache_from:
+      - lflare/lemmy-subscriber-bot:nightly
 
 - name: release
   image: plugins/docker
@@ -24,6 +26,9 @@ steps:
       from_secret: docker_username
     password:
       from_secret: docker_password
+    cache_from:
+      - lflare/lemmy-subscriber-bot:nightly
+      - lflare/lemmy-subscriber-bot:latest
   when:
     event:
     - tag
