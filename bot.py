@@ -321,7 +321,7 @@ class Bot:
                 # to either resolve or subscribe.
                 if users_active_half_year >= self.threshold_subscribe:
                     if community_addr in self.db and self.db[community_addr] == -1:
-                        logger.debug(f"SKIPPING SUBSCRIBE: {instance}/{name}")
+                        logger.debug(f"SKIPPING SUBSCRIBED: {instance}/{name}")
                         continue
 
                     logger.info(f"QUEUED SUBSCRIBE: {instance}/{name}")
@@ -329,7 +329,7 @@ class Bot:
 
                 elif users_active_half_year >= self.threshold_resolve:
                     if community_addr in self.db:
-                        logger.debug(f"SKIPPING RESOLVE: {instance}/{name}")
+                        logger.debug(f"SKIPPING RESOLVED: {instance}/{name}")
                         continue
 
                     logger.info(f"QUEUED RESOLVE: {instance}/{name}")
