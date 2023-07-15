@@ -502,7 +502,7 @@ def main():
 
     # Languages
     if args.lang_codes:
-        args.lang_codes = args.lang.split(",")
+        args.lang_codes = args.lang_codes.split(",")
 
     # Create bot
     bot = Bot(
