@@ -45,7 +45,7 @@ class Bot:
         database="database.db",
     ):
         self.db = shelve.open(database)
-        self.domain = domain
+        self.domain = domain  # e.g. lemmy.ml
         self.username = username
         self.password = password
         self.threshold_resolve = threshold_resolve
@@ -110,6 +110,10 @@ class Bot:
             for instance in self.instances:
                 # Skip bad instances
                 if instance in self.bad_instances:
+                    continue
+
+                # Skip own instance
+                if instance == self.domain:
                     continue
 
                 # Otherwise, get communities
