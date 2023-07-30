@@ -40,7 +40,7 @@ class Bot:
         daemon_delay,
         only_instances=[],
         bad_instances=[],
-        no_nsfw=False,
+        nsfw=False,
         lang_codes=None,
         database="database.db",
     ):
@@ -54,7 +54,7 @@ class Bot:
         self.daemon_delay = daemon_delay
         self.instances = []
         self.bad_instances = []
-        self.no_nsfw = no_nsfw
+        self.nsfw = nsfw
         self.lang_codes = lang_codes
 
         # Prepare bot runtime variables
@@ -149,7 +149,7 @@ class Bot:
             try:
                 # Get and parse community list
                 r = session.get(
-                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw=true&page={i}&auth={self.jwt}"
+                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw={self.nsfw}&page={i}&auth={self.jwt}"
                 )
                 r_json = r.json()
                 if len(r_json["communities"]) == 0:
@@ -295,7 +295,7 @@ class Bot:
                     continue
 
                 # Check if nsfw filter passes
-                if self.no_nsfw == True and c["community"]["nsfw"] == True:
+                if self.nsfw == False and c["community"]["nsfw"] == True:
                     logger.debug(f"SKIPPING NSFW: {instance}/{name}")
                     continue
 
@@ -467,20 +467,52 @@ class Bot:
 
 def main():
     # Get and parse arguments
-    parser = argparse.ArgumentParser(description="lemmy-subscriber")
+    parser = argparse.ArgumentParser(
+        description="lemmy-subscriber", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument("-v", "--verbose", action="count", default=0)
-    parser.add_argument("--reset", action="store_true", default=False)
-    parser.add_argument("--database", default=os.environ.get("LEMMY_DATABASE"))
-    parser.add_argument("--domain", default=os.environ.get("LEMMY_DOMAIN"))
-    parser.add_argument("--username", default=os.environ.get("LEMMY_USERNAME"))
-    parser.add_argument("--password", default=os.environ.get("LEMMY_PASSWORD"))
-    parser.add_argument("--threshold-add", type=int, default=os.environ.get("LEMMY_THRESHOLD_ADD", 50))
-    parser.add_argument("--threshold-subscribe", type=int, default=os.environ.get("LEMMY_THRESHOLD_SUBSCRIBE", 100))
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        default=False,
+        help='unsubscribes to specificed instances if `--instances="example instance" OR RESETS all subscriptions if `--instances=""` (CAUTION: USE WITH CARE)',
+    )
+    parser.add_argument(
+        "--database", default=os.environ.get("LEMMY_DATABASE"), help="database file to store database at"
+    )
+    parser.add_argument("--domain", default=os.environ.get("LEMMY_DOMAIN"), help="lemmy instance")
+    parser.add_argument("--username", default=os.environ.get("LEMMY_USERNAME"), help="lemmy username")
+    parser.add_argument("--password", default=os.environ.get("LEMMY_PASSWORD"), help="lemmy password")
+
     parser.add_argument("--daemon", action="store_true", default=False)
-    parser.add_argument("--daemon-delay", type=int, default=86400)
-    parser.add_argument("--instances", type=str, help="comma-separated instances, e.g. 'lemmy.ml,beehaw.org'")
-    parser.add_argument("--no-nsfw", action="store_true", default=False)
+    parser.add_argument("--daemon-delay", type=int, default=86400, help="delay between executions in daemon mode")
+
     parser.add_argument("--lang-codes", type=str, help="comma-separated language codes (e.g. und, en, de)")
+    parser.add_argument(
+        "--threshold-add",
+        type=int,
+        default=os.environ.get("LEMMY_THRESHOLD_ADD", 50),
+        help="minimum users to resolve",
+    )
+    parser.add_argument(
+        "--threshold-subscribe",
+        type=int,
+        default=os.environ.get("LEMMY_THRESHOLD_SUBSCRIBE", 100),
+        help="minimum users to subscribe",
+    )
+    parser.add_argument(
+        "--nsfw",
+        action="store_true",
+        default=False,
+        help="resolve/subscribe to nsfw communities",
+    )
+    parser.add_argument(
+        "--instances",
+        type=str,
+        help="comma-separated instances, e.g. 'lemmy.ml,beehaw.org', prefix with '!' to negate",
+        default="!lemmygrad.ml,!exploding-heads.com,!lemmynsfw.com",
+    )
+
     args = parser.parse_args()
     if not args.domain or not args.username or not args.password:
         exit(parser.print_usage())
@@ -519,7 +551,7 @@ def main():
         daemon_delay=args.daemon_delay,
         only_instances=only_instances,
         bad_instances=bad_instances,
-        no_nsfw=args.no_nsfw,
+        nsfw=args.nsfw,
         lang_codes=args.lang_codes,
     )
 
