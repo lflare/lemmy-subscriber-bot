@@ -149,7 +149,7 @@ class Bot:
             try:
                 # Get and parse community list
                 r = session.get(
-                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw={self.nsfw}&page={i}&auth={self.jwt}"
+                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw={str(self.nsfw).lower()}&page={i}&auth={self.jwt}"
                 )
                 r_json = r.json()
                 if len(r_json["communities"]) == 0:
