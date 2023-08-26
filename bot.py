@@ -258,7 +258,7 @@ class Bot:
         for page in range(1, 99999):
             try:
                 logger.trace(f"retrieving communities - {instance} / page {page}")
-                r = session.get(f"https://{instance}/api/v3/community/list?type_=Local&sort=TopSixMonths&page={page}")
+                r = session.get(f"https://{instance}/api/v3/community/list?type_=Local&sort=TopMonth&page={page}")
                 # sorting logic:
                 # https://github.com/LemmyNet/lemmy/blob/0c82f4e66065b5772fede010a879d327135dbb1e/crates/db_views_actor/src/community_view.rs#L171
                 r_json = r.json()
