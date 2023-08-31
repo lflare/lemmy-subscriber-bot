@@ -15,6 +15,7 @@ from typing import Tuple
 
 import requests
 from loguru import logger
+from retry import retry
 
 # Prepare logger
 logger.remove()
@@ -26,6 +27,14 @@ timeout = 15
 # Prepare global session and timeout
 session = requests.Session()
 session.request = functools.partial(session.request, timeout=timeout)
+
+
+class ResolveException(Exception):
+    pass
+
+
+class SubscribeException(Exception):
+    pass
 
 
 class Bot:
@@ -117,7 +126,10 @@ class Bot:
                     continue
 
                 # Otherwise, get communities
-                communities = self.get_instance_communities(instance)
+                try:
+                    communities = self.get_instance_communities(instance)
+                except Exception as e:
+                    logger.error(f"failed to get instance '{instance}' communities: {e}")
 
             # Print statistics
             logger.success("finished instance iteration")
@@ -219,25 +231,16 @@ class Bot:
         logger.info(f"loaded {len(baseurls)} instances from lemmyverse.net")
         return baseurls
 
+    @retry(tries=3)
     def get_instance_communities(self, instance):
         # If language filter specified, get supported language codes
         lang_ids = []
         if self.lang_codes is not None and len(self.lang_codes) > 0:
-            try:
-                logger.trace(f"retrieving instance details - {instance}")
-                r = session.get(f"https://{instance}/api/v3/site")
-                # sorting logic:
-                # https://github.com/LemmyNet/lemmy/blob/0c82f4e66065b5772fede010a879d327135dbb1e/crates/db_views_actor/src/community_view.rs#L171
-                r_json = r.json()
-            except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"failed to get communities from '{instance}' - {e}: '{r.text}'")
-                return
-            except requests.exceptions.Timeout as e:
-                logger.error(f"failed to get communities from '{instance}' - {e}")
-                return
-            except Exception as e:
-                logger.exception("unhandled exception")
-                return
+            logger.trace(f"retrieving instance details - {instance}")
+            r = session.get(f"https://{instance}/api/v3/site")
+            # sorting logic:
+            # https://github.com/LemmyNet/lemmy/blob/0c82f4e66065b5772fede010a879d327135dbb1e/crates/db_views_actor/src/community_view.rs#L171
+            r_json = r.json()
 
             # Loop through all langauges and resolve code
             all_languages = r_json["all_languages"]
@@ -357,90 +360,51 @@ class Bot:
             return self.db[community_addr]
 
         # Attempt to resolve
-        try:
-            r = session.get(f"https://{self.domain}/api/v3/resolve_object?q={community_addr}&auth={self.jwt}")
-            r_json = r.json()
-        except requests.exceptions.JSONDecodeError as e:
-            logger.error(f"failed to resolve community - {e}: '{r.text}'")
-            return 0
-        except requests.exceptions.Timeout as e:
-            logger.error(f"failed to resolve community - {e}")
-            return 0
-        except Exception as e:
-            logger.exception("unhandled exception")
-            return 0
+        r = session.get(f"https://{self.domain}/api/v3/resolve_object?q={community_addr}&auth={self.jwt}")
+        r_json = r.json()
 
         # Check if there is an error
-        if "error" in r_json:
-            if r_json["error"] == "couldnt_find_object":
-                return 0
+        if "error" in r_json and r_json["error"] == "couldnt_find_object":
+            raise ResolveException
 
         # Return result
         logger.info(f"RESOLVED: {community_addr}")
         self.db[community_addr] = r_json["community"]["community"]["id"]
         return r_json["community"]["community"]["id"]
 
+    @retry(tries=3)
     def subscribe_community(self, community_addr):
         # Return if already subscribed in database
         if community_addr in self.db and self.db[community_addr] == -1:
             return
 
-        # Try up to 5 times to subscribe to a community
-        for _ in range(5):
-            # Attempt to resolve
-            id = self.resolve_community(community_addr)
-            if id <= 0:
-                continue
+        # Attempt to resolve
+        id = self.resolve_community(community_addr)
 
-            # Attempt to subscribe
-            try:
-                follow_payload = {"community_id": id, "follow": True, "auth": self.jwt}
-                r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
-                r_json = r.json()
-            except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"failed to follow community - {e}: '{r.text}'")
-                continue
-            except requests.exceptions.Timeout as e:
-                logger.error(f"failed to follow community - {e}: '{r.text}'")
-                continue
-            except Exception as e:
-                logger.exception("unhandled exception")
-                continue
+        # Attempt to subscribe
+        follow_payload = {"community_id": id, "follow": True, "auth": self.jwt}
+        r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
+        r_json = r.json()
 
-            # Log and mark as subscribed in DB
-            logger.trace(f"{community_addr} - {r.text}")
-            logger.info(f"SUBSCRIBED: {community_addr}")
-            self.db[community_addr] = -1
-            break
+        # Log and mark as subscribed in DB
+        logger.trace(f"{community_addr} - {r.text}")
+        logger.info(f"SUBSCRIBED: {community_addr}")
+        self.db[community_addr] = -1
 
+    @retry(tries=3)
     def unsubscribe_community(self, community_addr, community_id):
-        # Try up to 5 times to unsubscribe to a community
-        for _ in range(5):
-            # Attempt to resolve
-            id = self.resolve_community(community_addr)
-            if id <= 0:
-                continue
+        # Attempt to resolve
+        id = self.resolve_community(community_addr)
 
-            # Attempt to unsubscribe
-            try:
-                follow_payload = {"community_id": id, "follow": False, "auth": self.jwt}
-                r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
-                r_json = r.json()
-            except requests.exceptions.JSONDecodeError as e:
-                logger.error(f"failed to unsubscribe community - {e}: '{r.text}'")
-                continue
-            except requests.exceptions.Timeout as e:
-                logger.error(f"failed to unsubscribe community - {e}: '{r.text}'")
-                continue
-            except Exception as e:
-                logger.exception("unhandled exception")
-                continue
+        # Attempt to unsubscribe
+        follow_payload = {"community_id": id, "follow": False, "auth": self.jwt}
+        r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
+        r_json = r.json()
 
-            # Log and mark as subscribed in DB
-            logger.trace(f"{community_addr} - {r.text}")
-            logger.info(f"UNSUBSCRIBED: {community_addr}")
-            self.db[community_addr] = community_id
-            break
+        # Log and mark as subscribed in DB
+        logger.trace(f"{community_addr} - {r.text}")
+        logger.info(f"UNSUBSCRIBED: {community_addr}")
+        self.db[community_addr] = community_id
 
     def community_resolver_thread(self):
         while True:
@@ -450,7 +414,10 @@ class Bot:
             if community_addr in self.db:
                 continue
 
-            self.resolve_community(community_addr)
+            try:
+                self.resolve_community(community_addr)
+            except Exception:
+                logger.error(f"failed to resolve community '{community_addr}'")
             time.sleep(1)
 
     def community_subscriber_thread(self):
@@ -461,7 +428,10 @@ class Bot:
             if community_addr in self.db and self.db[community_addr] == -1:
                 continue
 
-            self.subscribe_community(community_addr)
+            try:
+                self.subscribe_community(community_addr)
+            except Exception:
+                logger.error(f"failed to subscribe community '{community_addr}'")
             time.sleep(1)
 
 
