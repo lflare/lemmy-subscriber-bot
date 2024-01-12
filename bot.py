@@ -39,19 +39,19 @@ class SubscribeException(Exception):
 
 class Bot:
     def __init__(
-        self,
-        domain,
-        username,
-        password,
-        threshold_resolve,
-        threshold_subscribe,
-        daemon,
-        daemon_delay,
-        only_instances=[],
-        bad_instances=[],
-        nsfw=False,
-        lang_codes=None,
-        database="database.db",
+            self,
+            domain,
+            username,
+            password,
+            threshold_resolve,
+            threshold_subscribe,
+            daemon,
+            daemon_delay,
+            only_instances=[],
+            bad_instances=[],
+            nsfw=False,
+            lang_codes=None,
+            database="database.db",
     ):
         self.db = shelve.open(database)
         self.domain = domain  # e.g. lemmy.ml
@@ -70,6 +70,7 @@ class Bot:
         self.rq = queue.Queue(16)
         self.sq = queue.Queue(16)
         self.jwt = None
+        self.headers = {}
 
         # Override instances
         if len(only_instances) > 0:
@@ -161,7 +162,8 @@ class Bot:
             try:
                 # Get and parse community list
                 r = session.get(
-                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw={str(self.nsfw).lower()}&page={i}&auth={self.jwt}"
+                    f"https://{self.domain}/api/v3/community/list?type_=Subscribed&show_nsfw={str(self.nsfw).lower()}&page={i}",
+                    headers=self.headers
                 )
                 r_json = r.json()
                 if len(r_json["communities"]) == 0:
@@ -196,6 +198,10 @@ class Bot:
         payload = {"username_or_email": self.username, "password": self.password}
         r = session.post(f"https://{self.domain}/api/v3/user/login", json=payload)
         self.jwt = r.json()["jwt"]
+        self.headers = {
+            'Authorization': 'Bearer ' + self.jwt,
+            'Content-Type': 'application/json'
+        }
         logger.success(f"logged in as: {self.username}")
 
     def get_instances(self):
@@ -360,7 +366,7 @@ class Bot:
             return self.db[community_addr]
 
         # Attempt to resolve
-        r = session.get(f"https://{self.domain}/api/v3/resolve_object?q={community_addr}&auth={self.jwt}")
+        r = session.get(f"https://{self.domain}/api/v3/resolve_object?q={community_addr}", headers=self.headers)
         r_json = r.json()
 
         # Check if there is an error
@@ -382,8 +388,9 @@ class Bot:
         id = self.resolve_community(community_addr)
 
         # Attempt to subscribe
-        follow_payload = {"community_id": id, "follow": True, "auth": self.jwt}
-        r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
+        follow_payload = {"community_id": id, "follow": True}
+        r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload,
+                         headers=self.headers)
         r_json = r.json()
 
         # Log and mark as subscribed in DB
@@ -397,8 +404,9 @@ class Bot:
         id = self.resolve_community(community_addr)
 
         # Attempt to unsubscribe
-        follow_payload = {"community_id": id, "follow": False, "auth": self.jwt}
-        r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload)
+        follow_payload = {"community_id": id, "follow": False}
+        r = session.post(f"https://{self.domain}/api/v3/community/follow", timeout=15, json=follow_payload,
+                         headers=self.headers)
         r_json = r.json()
 
         # Log and mark as subscribed in DB
