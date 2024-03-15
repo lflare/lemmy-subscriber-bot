@@ -398,6 +398,7 @@ class Bot:
         logger.info(f"SUBSCRIBED: {community_addr}")
         self.db[community_addr] = -1
 
+    @logger.catch(message="failed to unsub")
     @retry(tries=3)
     def unsubscribe_community(self, community_addr, community_id):
         # Attempt to resolve
